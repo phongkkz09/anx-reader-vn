@@ -68,8 +68,8 @@ android {
 
     buildTypes {
         release {
-            // signingConfig signingConfigs.debug
-            signingConfig signingConfigs.release
+            // Use debug signing if no release keystore (CI builds)
+            signingConfig keystoreProperties['storeFile'] ? signingConfigs.release : signingConfigs.debug
 
         }
     }
@@ -103,4 +103,5 @@ flutter {
     source '../..'
 }
 
-dependencies {}
+dependencies {
+}
