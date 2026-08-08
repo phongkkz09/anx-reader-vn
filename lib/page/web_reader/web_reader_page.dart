@@ -6,6 +6,7 @@ import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/web_reader/web_reader_settings.dart';
 import 'package:anx_reader/service/web_reader/web_source.dart';
+import 'package:anx_reader/service/web_reader/web_reader_handler.dart';
 import 'package:anx_reader/widgets/web_reader/web_reader_settings_sheet.dart';
 import 'package:anx_reader/widgets/web_reader/source_manager_dialog.dart';
 
@@ -20,6 +21,7 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
   final _urlController = TextEditingController();
   final _settings = WebReaderSettings();
   final _sourceService = WebSourceService();
+  final _audioHandler = WebReaderHandler();
   late BaseTts _tts;
   bool _ttsInitialized = false;
   String? _sleepTimerDisplay;
@@ -33,7 +35,7 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
 
   void _initSleepTimer() {
     _settings.addSleepTimerListener(() {
-      _tts.stop();
+      _audioHandler.stop();
       ref.read(webReaderProvider.notifier).setPlaying(false);
       setState(() {
         _sleepTimerDisplay = null;
@@ -48,10 +50,21 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
 
   Future<void> _initTts() async {
     _tts = TtsFactory().current;
-    await _tts.init(
-      () {},
-      () async => ref.read(webReaderProvider).content?.content ?? '',
-      () async => '',
+    await _audioHandler.init(
+      getCurrentText: () async => ref.read(webReaderProvider).content?.content ?? '',
+      getNextText: () async => ref.read(webReaderProvider).content?.content ?? '',
+      getPrevText: () async => '',
+      onNextChapter: () {
+        ref.read(webReaderProvider.notifier).loadNextChapter();
+        Future.delayed(const Duration(milliseconds: 300), _speakCurrentContent);
+      },
+      onPrevChapter: () {
+        ref.read(webReaderProvider.notifier).loadPrevChapter();
+        Future.delayed(const Duration(milliseconds: 300), _speakCurrentContent);
+      },
+      onStop: () {
+        ref.read(webReaderProvider.notifier).setPlaying(false);
+      },
     );
     _ttsInitialized = true;
   }
@@ -75,68 +88,58 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
     final state = ref.read(webReaderProvider);
 
     if (state.isPlaying) {
-      await _tts.pause();
+      await _audioHandler.pause();
       notifier.setPlaying(false);
     } else {
       if (state.content?.content.isNotEmpty ?? false) {
-        final textToSpeak = _settings.applyPronunciations(state.content!.content);
-        await _tts.speak(content: textToSpeak);
+        _audioHandler.setMetadata(
+          title: state.content!.title,
+          url: state.content!.url,
+        );
+        await _audioHandler.play();
         notifier.setPlaying(true);
-
-        _listenForCompletion();
       }
     }
   }
 
   void _listenForCompletion() {
-    _tts.ttsStateNotifier.addListener(_onTtsStateChange);
+    // Now handled by WebReaderHandler - no manual listener needed
   }
 
   void _onTtsStateChange() {
-    if (!_ttsInitialized) return;
-
-    final ttsState = _tts.ttsStateNotifier.value;
-    if (ttsState == TtsStateEnum.stopped) {
-      final state = ref.read(webReaderProvider);
-      if (state.isPlaying) {
-        _tts.ttsStateNotifier.removeListener(_onTtsStateChange);
-        
-        // Notify chapter changed for sleep timer
-        _settings.chapterChanged();
-        
-        if (state.content?.hasNextChapter ?? false) {
-          ref.read(webReaderProvider.notifier).loadNextChapter();
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (ref.read(webReaderProvider).isPlaying) {
-              _speakCurrentContent();
-            }
-          });
-        } else {
-          ref.read(webReaderProvider.notifier).setPlaying(false);
-        }
-      }
-    }
+    // Now handled by WebReaderHandler - no manual listener needed
   }
 
   Future<void> _speakCurrentContent() async {
     final state = ref.read(webReaderProvider);
     if (state.content?.content.isNotEmpty ?? false) {
-      final textToSpeak = _settings.applyPronunciations(state.content!.content);
-      await _tts.speak(content: textToSpeak);
+      _audioHandler.setMetadata(
+        title: state.content!.title,
+        url: state.content!.url,
+      );
+      await _audioHandler.play();
     }
   }
 
   void _nextChapter() {
     ref.read(webReaderProvider.notifier).loadNextChapter();
     if (ref.read(webReaderProvider).isPlaying) {
-      Future.delayed(const Duration(milliseconds: 500), _speakCurrentContent);
+      _audioHandler.setMetadata(
+        title: ref.read(webReaderProvider).content?.title ?? 'Next',
+        url: ref.read(webReaderProvider).content?.nextChapterUrl ?? '',
+      );
+      Future.delayed(const Duration(milliseconds: 300), _speakCurrentContent);
     }
   }
 
   void _prevChapter() {
     ref.read(webReaderProvider.notifier).loadPrevChapter();
     if (ref.read(webReaderProvider).isPlaying) {
-      Future.delayed(const Duration(milliseconds: 500), _speakCurrentContent);
+      _audioHandler.setMetadata(
+        title: ref.read(webReaderProvider).content?.title ?? 'Prev',
+        url: ref.read(webReaderProvider).content?.prevChapterUrl ?? '',
+      );
+      Future.delayed(const Duration(milliseconds: 300), _speakCurrentContent);
     }
   }
 

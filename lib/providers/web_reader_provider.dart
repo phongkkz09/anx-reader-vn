@@ -50,8 +50,11 @@ class WebReaderState {
 /// Notifier for web reader state
 class WebReaderNotifier extends StateNotifier<WebReaderState> {
   final WebContentExtractor _extractor = WebContentExtractor();
+  final VoidCallback? _onChapterChanged;
 
-  WebReaderNotifier() : super(WebReaderState()) {
+  WebReaderNotifier({VoidCallback? onChapterChanged})
+      : _onChapterChanged = onChapterChanged,
+        super(WebReaderState()) {
     _restoreProgress();
   }
 
@@ -95,12 +98,14 @@ class WebReaderNotifier extends StateNotifier<WebReaderState> {
   Future<void> loadNextChapter() async {
     if (state.content?.nextChapterUrl == null) return;
     await loadContent(state.content!.nextChapterUrl!);
+    _onChapterChanged?.call();
   }
 
   /// Load previous chapter
   Future<void> loadPrevChapter() async {
     if (state.content?.prevChapterUrl == null) return;
     await loadContent(state.content!.prevChapterUrl!);
+    _onChapterChanged?.call();
   }
 
   /// Load specific chapter by index
@@ -111,6 +116,7 @@ class WebReaderNotifier extends StateNotifier<WebReaderState> {
     final chapter = state.content!.chapters[index];
     await loadContent(chapter.url);
     state = state.copyWith(showChapterList: false);
+    _onChapterChanged?.call();
   }
 
   /// Toggle chapter list visibility
@@ -132,5 +138,10 @@ class WebReaderNotifier extends StateNotifier<WebReaderState> {
 /// Riverpod provider for web reader
 final webReaderProvider =
     StateNotifierProvider<WebReaderNotifier, WebReaderState>(
-  (ref) => WebReaderNotifier(),
+  (ref) => WebReaderNotifier(
+    onChapterChanged: () {
+      // Notify settings for sleep timer
+      WebReaderSettings().chapterChanged();
+    },
+  ),
 );
