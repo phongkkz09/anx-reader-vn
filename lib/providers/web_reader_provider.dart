@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:anx_reader/service/web_reader/web_content_extractor.dart';
+import 'package:anx_reader/service/web_reader/web_reader_settings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 
 /// State for web reader

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/tts_factory.dart';
 import 'package:anx_reader/service/web_reader/web_reader_settings.dart';
