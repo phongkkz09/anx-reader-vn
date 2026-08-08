@@ -5,6 +5,7 @@ import 'package:anx_reader/enums/sync_direction.dart';
 import 'package:anx_reader/enums/sync_trigger.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/page/home_page/ai_page.dart';
+import 'package:anx_reader/page/web_reader/web_reader_page.dart';
 import 'package:anx_reader/service/initialization_check.dart';
 import 'package:anx_reader/page/home_page/bookshelf_page.dart';
 import 'package:anx_reader/page/home_page/notes_page.dart';
@@ -217,6 +218,18 @@ class _HomePageState extends ConsumerState<HomePage> {
         if (constraints.maxWidth > 600) {
           return Scaffold(
             extendBody: true,
+            floatingActionButton: FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const WebReaderPage(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.public),
+              label: const Text('Nghe truyện Web'),
+            ),
             body: Row(
               children: [
                 SafeArea(
@@ -266,6 +279,18 @@ class _HomePageState extends ConsumerState<HomePage> {
           }
           return Scaffold(
             extendBody: true,
+            floatingActionButton: FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const WebReaderPage(),
+                  ),
+                );
+              },
+              child: const Icon(Icons.public),
+              tooltip: 'Nghe truyện Web',
+            ),
             body: BottomBar(
               width: 330,
               body: (_, controller) =>
