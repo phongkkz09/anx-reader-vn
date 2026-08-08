@@ -4,6 +4,8 @@ import 'package:anx_reader/providers/web_reader_provider.dart';
 import 'package:anx_reader/service/tts/tts_factory.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
+import 'package:anx_reader/service/web_reader/web_reader_settings.dart';
+import 'package:anx_reader/widgets/web_reader/web_reader_settings_sheet.dart';
 
 class WebReaderPage extends ConsumerStatefulWidget {
   const WebReaderPage({Key? key}) : super(key: key);
@@ -14,13 +16,31 @@ class WebReaderPage extends ConsumerStatefulWidget {
 
 class _WebReaderPageState extends ConsumerState<WebReaderPage> {
   final _urlController = TextEditingController();
+  final _settings = WebReaderSettings();
   late BaseTts _tts;
   bool _ttsInitialized = false;
+  String? _sleepTimerDisplay;
 
   @override
   void initState() {
     super.initState();
     _initTts();
+    _initSleepTimer();
+  }
+
+  void _initSleepTimer() {
+    _settings.addSleepTimerListener(() {
+      _tts.stop();
+      ref.read(webReaderProvider.notifier).setPlaying(false);
+      setState(() {
+        _sleepTimerDisplay = null;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Hẹn giờ đã kết thúc')),
+        );
+      }
+    });
   }
 
   Future<void> _initTts() async {
@@ -36,6 +56,7 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
   @override
   void dispose() {
     _urlController.dispose();
+    _settings.removeSleepTimerListener(() {});
     super.dispose();
   }
 
@@ -55,10 +76,10 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
       notifier.setPlaying(false);
     } else {
       if (state.content?.content.isNotEmpty ?? false) {
-        await _tts.speak(content: state.content!.content);
+        final textToSpeak = _settings.applyPronunciations(state.content!.content);
+        await _tts.speak(content: textToSpeak);
         notifier.setPlaying(true);
 
-        // Listen for completion to auto-load next chapter
         _listenForCompletion();
       }
     }
@@ -75,18 +96,19 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
     if (ttsState == TtsStateEnum.stopped) {
       final state = ref.read(webReaderProvider);
       if (state.isPlaying) {
-        // TTS completed - auto load next chapter if available
         _tts.ttsStateNotifier.removeListener(_onTtsStateChange);
+        
+        // Notify chapter changed for sleep timer
+        _settings.chapterChanged();
+        
         if (state.content?.hasNextChapter ?? false) {
           ref.read(webReaderProvider.notifier).loadNextChapter();
-          // Wait a bit then continue playing
           Future.delayed(const Duration(milliseconds: 500), () {
             if (ref.read(webReaderProvider).isPlaying) {
               _speakCurrentContent();
             }
           });
         } else {
-          // No next chapter, stop playing
           ref.read(webReaderProvider.notifier).setPlaying(false);
         }
       }
@@ -96,7 +118,8 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
   Future<void> _speakCurrentContent() async {
     final state = ref.read(webReaderProvider);
     if (state.content?.content.isNotEmpty ?? false) {
-      await _tts.speak(content: state.content!.content);
+      final textToSpeak = _settings.applyPronunciations(state.content!.content);
+      await _tts.speak(content: textToSpeak);
     }
   }
 
@@ -306,14 +329,16 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
                   // TTS Settings Button
                   ElevatedButton.icon(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('TTS Settings - Coming soon'),
-                        ),
+                      WebReaderSettingsSheet.show(
+                        context,
+                        settings: _settings,
+                        onSettingsChanged: () {
+                          setState(() {});
+                        },
                       );
                     },
                     icon: const Icon(Icons.settings),
-                    label: const Text('Cài đặt giọng đọc'),
+                    label: const Text('Cài đặt nghe truyện'),
                   ),
                 ],
               ),
