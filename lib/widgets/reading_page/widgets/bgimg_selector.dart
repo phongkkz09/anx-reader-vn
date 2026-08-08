@@ -455,10 +455,11 @@ class _BgimgSelectorState extends ConsumerState<BgimgSelector> {
                     currentBgimg.type != BgimgType.none &&
                     currentBgimg.path == model.path;
                 final item = switch (model.type) {
-                  BgimgType.none => buildNoneBgimgItem(model),
-                  BgimgType.assets => buildAssetBgimgItem(model),
-                  BgimgType.localFile => buildLocalFileBgimgItem(model),
-                };
+                                  BgimgType.none => buildNoneBgimgItem(model),
+                                  BgimgType.assets => buildAssetBgimgItem(model),
+                                  BgimgType.localFile => buildLocalFileBgimgItem(model),
+                                  _ => buildNoneBgimgItem(model),
+                                };
                 if (isSelected) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
