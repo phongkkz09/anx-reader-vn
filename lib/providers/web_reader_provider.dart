@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'web_content_extractor.dart';
+import 'package:anx_reader/service/web_reader/web_content_extractor.dart';
 
 /// State for web reader
 class WebReaderState {
