@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:anx_reader/service/web_reader/web_content_extractor.dart';
+import 'package:anx_reader/config/shared_preference_provider.dart';
 
 /// State for web reader
 class WebReaderState {
@@ -8,6 +9,7 @@ class WebReaderState {
   final bool isLoading;
   final String? error;
   final bool isPlaying;
+  final bool showChapterList;
 
   WebReaderState({
     this.url,
@@ -15,6 +17,7 @@ class WebReaderState {
     this.isLoading = false,
     this.error,
     this.isPlaying = false,
+    this.showChapterList = false,
   });
 
   WebReaderState copyWith({
@@ -23,14 +26,24 @@ class WebReaderState {
     bool? isLoading,
     String? error,
     bool? isPlaying,
+    bool? showChapterList,
   }) {
     return WebReaderState(
       url: url ?? this.url,
       content: content ?? this.content,
       isLoading: isLoading ?? this.isLoading,
-      error: error ?? this.error,
+      error: error,
       isPlaying: isPlaying ?? this.isPlaying,
+      showChapterList: showChapterList ?? this.showChapterList,
     );
+  }
+
+  /// Chapter info string
+  String get chapterInfo {
+    if (content == null || content!.chapters.isEmpty) return '';
+    final current = content!.currentChapterIndex + 1;
+    final total = content!.chapters.length;
+    return '$current / $total';
   }
 }
 
@@ -38,10 +51,25 @@ class WebReaderState {
 class WebReaderNotifier extends StateNotifier<WebReaderState> {
   final WebContentExtractor _extractor = WebContentExtractor();
 
-  WebReaderNotifier() : super(WebReaderState());
+  WebReaderNotifier() : super(WebReaderState()) {
+    _restoreProgress();
+  }
+
+  /// Restore last reading position
+  void _restoreProgress() {
+    final savedUrl = Prefs().get('web_reader_last_url') ?? '';
+    if (savedUrl.isNotEmpty) {
+      loadContent(savedUrl, saveProgress: false);
+    }
+  }
+
+  /// Save current reading position
+  void _saveProgress(String url) {
+    Prefs().set('web_reader_last_url', url);
+  }
 
   /// Fetch and extract content from URL
-  Future<void> loadContent(String url) async {
+  Future<void> loadContent(String url, {bool saveProgress = true}) async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
@@ -51,6 +79,10 @@ class WebReaderNotifier extends StateNotifier<WebReaderState> {
         content: content,
         isLoading: false,
       );
+
+      if (saveProgress) {
+        _saveProgress(url);
+      }
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -61,14 +93,29 @@ class WebReaderNotifier extends StateNotifier<WebReaderState> {
 
   /// Load next chapter
   Future<void> loadNextChapter() async {
-    if (state.content?.nextChapterUrl == null) {
-      state = state.copyWith(
-        error: 'No next chapter available',
-      );
-      return;
-    }
-
+    if (state.content?.nextChapterUrl == null) return;
     await loadContent(state.content!.nextChapterUrl!);
+  }
+
+  /// Load previous chapter
+  Future<void> loadPrevChapter() async {
+    if (state.content?.prevChapterUrl == null) return;
+    await loadContent(state.content!.prevChapterUrl!);
+  }
+
+  /// Load specific chapter by index
+  Future<void> loadChapter(int index) async {
+    if (state.content == null) return;
+    if (index < 0 || index >= state.content!.chapters.length) return;
+
+    final chapter = state.content!.chapters[index];
+    await loadContent(chapter.url);
+    state = state.copyWith(showChapterList: false);
+  }
+
+  /// Toggle chapter list visibility
+  void toggleChapterList() {
+    state = state.copyWith(showChapterList: !state.showChapterList);
   }
 
   /// Update playing state

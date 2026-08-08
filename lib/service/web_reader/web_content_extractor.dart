@@ -2,21 +2,52 @@ import 'package:dio/dio.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart' as html_dom;
 
+/// Model for a single chapter
+class WebChapter {
+  final String title;
+  final String url;
+  final int index;
+
+  WebChapter({
+    required this.title,
+    required this.url,
+    required this.index,
+  });
+}
+
 /// Model for extracted web content
 class WebContent {
   final String title;
   final String content;
+  final String url;
   final String? nextChapterUrl;
-  final List<String> chapters; // List of chapter titles
+  final String? prevChapterUrl;
+  final List<WebChapter> chapters; // Full chapter list with URLs
   final int currentChapterIndex;
 
   WebContent({
     required this.title,
     required this.content,
+    required this.url,
     this.nextChapterUrl,
+    this.prevChapterUrl,
     this.chapters = const [],
-    this.currentChapterIndex = 0,
+    this.currentChapterIndex = -1,
   });
+
+  /// Check if has next chapter
+  bool get hasNextChapter => nextChapterUrl != null;
+
+  /// Check if has prev chapter
+  bool get hasPrevChapter => prevChapterUrl != null;
+
+  /// Get current chapter
+  WebChapter? get currentChapter {
+    if (currentChapterIndex >= 0 && currentChapterIndex < chapters.length) {
+      return chapters[currentChapterIndex];
+    }
+    return null;
+  }
 }
 
 /// Service to fetch and extract content from web sources
@@ -53,17 +84,22 @@ class WebContentExtractor {
       // Extract main content
       final content = _extractMainContent(document);
 
-      // Extract next chapter URL
+      // Extract navigation URLs
       final nextUrl = _extractNextChapterUrl(document, url);
+      final prevUrl = _extractPrevChapterUrl(document, url);
 
-      // Extract chapter list
-      final chapters = _extractChapters(document);
+      // Extract chapter list with URLs
+      final chapters = _extractChapters(document, url);
+      final currentIndex = _findCurrentChapterIndex(chapters, url);
 
       return WebContent(
         title: title,
         content: content,
+        url: url,
         nextChapterUrl: nextUrl,
+        prevChapterUrl: prevUrl,
         chapters: chapters,
+        currentChapterIndex: currentIndex,
       );
     } catch (e) {
       throw Exception('Failed to extract content from $url: $e');
@@ -167,61 +203,91 @@ class WebContentExtractor {
   /// Extract next chapter URL
   String? _extractNextChapterUrl(html_dom.Document document, String baseUrl) {
     final nextSelectors = [
-      'a.next',
-      '.next-chapter',
-      'a[rel="next"]',
-      '.pagination a.next',
-      'a:contains("Next")',
-      'a:contains("next")',
-      'a:contains("Tiếp theo")',
+      'a.next', '.next-chapter', 'a[rel="next"]', '.pagination a.next',
+      'a:contains("Next")', 'a:contains("next")', 'a:contains("Tiếp theo")',
+      '.chapter-nav a:last-child', 'a:contains("next chapter")',
     ];
-
     for (final selector in nextSelectors) {
       final element = document.querySelector(selector);
       if (element != null) {
         final href = element.attributes['href'];
-        if (href != null) {
+        if (href != null && href.isNotEmpty) {
           return _resolveUrl(href, baseUrl);
         }
       }
     }
-
     return null;
   }
 
-  /// Extract chapter list for navigation
-  List<String> _extractChapters(html_dom.Document document) {
-    final chapterSelectors = [
-      '.chapter-list li a',
-      '.chapters li a',
-      'nav.toc a',
-      '.toc a',
+  /// Extract previous chapter URL
+  String? _extractPrevChapterUrl(html_dom.Document document, String baseUrl) {
+    final prevSelectors = [
+      'a.prev', '.prev-chapter', 'a[rel="prev"]', '.pagination a.prev',
+      'a:contains("Previous")', 'a:contains("Trước")',
+      '.chapter-nav a:first-child',
     ];
-
-    for (final selector in chapterSelectors) {
-      final elements = document.querySelectorAll(selector);
-      if (elements.isNotEmpty) {
-        return elements
-            .map((e) => e.text.trim())
-            .where((text) => text.isNotEmpty)
-            .toList();
+    for (final selector in prevSelectors) {
+      final element = document.querySelector(selector);
+      if (element != null) {
+        final href = element.attributes['href'];
+        if (href != null && href.isNotEmpty) {
+          return _resolveUrl(href, baseUrl);
+        }
       }
     }
+    return null;
+  }
 
+  /// Extract chapter list with URLs
+  List<WebChapter> _extractChapters(html_dom.Document document, String currentUrl) {
+    final chapterSelectors = [
+      '.chapter-list li a', '.list-chapter a', '#list-chapter a',
+      '.chapters li a', 'nav.toc a', '.toc a', '.table-of-contents a',
+      '.chapter-nav a', '[class*="chapter"] a', '[class*="toc"] a',
+      'a[href*="chapter"]',
+    ];
+    for (final selector in chapterSelectors) {
+      final elements = document.querySelectorAll(selector);
+      if (elements.length >= 2) {
+        final chapters = <WebChapter>[];
+        for (int i = 0; i < elements.length; i++) {
+          final text = elements[i].text.trim();
+          final href = elements[i].attributes['href'];
+          if (text.isNotEmpty && href != null && href.isNotEmpty) {
+            chapters.add(WebChapter(
+              title: text,
+              url: _resolveUrl(href, currentUrl),
+              index: i,
+            ));
+          }
+        }
+        if (chapters.length >= 2) return chapters;
+      }
+    }
     return [];
+  }
+
+  /// Find current chapter index
+  int _findCurrentChapterIndex(List<WebChapter> chapters, String currentUrl) {
+    if (chapters.isEmpty) return -1;
+    final normalizedCurrent = _normalizeUrl(currentUrl);
+    for (int i = 0; i < chapters.length; i++) {
+      if (_normalizeUrl(chapters[i].url) == normalizedCurrent) return i;
+    }
+    return -1;
+  }
+
+  /// Normalize URL for comparison
+  String _normalizeUrl(String url) {
+    return url.replaceAll(RegExp(r'\?.*$'), '').replaceAll(RegExp(r'#.*$'), '')
+        .replaceAll(RegExp(r'/$'), '').toLowerCase();
   }
 
   /// Resolve relative URLs
   String _resolveUrl(String url, String baseUrl) {
-    if (url.startsWith('http')) {
-      return url;
-    }
-
+    if (url.startsWith('http')) return url;
     final base = Uri.parse(baseUrl);
-    if (url.startsWith('/')) {
-      return '${base.scheme}://${base.host}$url';
-    }
-
+    if (url.startsWith('/')) return '${base.scheme}://${base.host}$url';
     return '${base.scheme}://${base.host}${base.path}/$url';
   }
 }

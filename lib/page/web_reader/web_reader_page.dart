@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:anx_reader/providers/web_reader_provider.dart';
 import 'package:anx_reader/service/tts/tts_factory.dart';
+import 'package:anx_reader/service/tts/base_tts.dart';
+import 'package:anx_reader/service/tts/tts_service.dart';
 
 class WebReaderPage extends ConsumerStatefulWidget {
   const WebReaderPage({Key? key}) : super(key: key);
@@ -12,23 +14,23 @@ class WebReaderPage extends ConsumerStatefulWidget {
 
 class _WebReaderPageState extends ConsumerState<WebReaderPage> {
   final _urlController = TextEditingController();
-  late Future<void> _ttsInitFuture;
+  late BaseTts _tts;
+  bool _ttsInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    // Initialize TTS
-    _ttsInitFuture = _initTts();
+    _initTts();
   }
 
   Future<void> _initTts() async {
-    final tts = TtsFactory().current;
-    // Initialize with dummy functions for web reader
-    await tts.init(
-      () {}, // getCurrentText
+    _tts = TtsFactory().current;
+    await _tts.init(
+      () {},
       () async => ref.read(webReaderProvider).content?.content ?? '',
-      () async => '', // getPrevText
+      () async => '',
     );
+    _ttsInitialized = true;
   }
 
   @override
@@ -44,24 +46,76 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
     }
   }
 
-  void _togglePlayPause() async {
+  Future<void> _togglePlayPause() async {
     final notifier = ref.read(webReaderProvider.notifier);
     final state = ref.read(webReaderProvider);
-    final tts = TtsFactory().current;
 
     if (state.isPlaying) {
-      await tts.pause();
+      await _tts.pause();
       notifier.setPlaying(false);
     } else {
       if (state.content?.content.isNotEmpty ?? false) {
-        await tts.speak(content: state.content!.content);
+        await _tts.speak(content: state.content!.content);
         notifier.setPlaying(true);
+
+        // Listen for completion to auto-load next chapter
+        _listenForCompletion();
       }
+    }
+  }
+
+  void _listenForCompletion() {
+    _tts.ttsStateNotifier.addListener(_onTtsStateChange);
+  }
+
+  void _onTtsStateChange() {
+    if (!_ttsInitialized) return;
+
+    final ttsState = _tts.ttsStateNotifier.value;
+    if (ttsState == TtsStateEnum.stopped) {
+      final state = ref.read(webReaderProvider);
+      if (state.isPlaying) {
+        // TTS completed - auto load next chapter if available
+        _tts.ttsStateNotifier.removeListener(_onTtsStateChange);
+        if (state.content?.hasNextChapter ?? false) {
+          ref.read(webReaderProvider.notifier).loadNextChapter();
+          // Wait a bit then continue playing
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (ref.read(webReaderProvider).isPlaying) {
+              _speakCurrentContent();
+            }
+          });
+        } else {
+          // No next chapter, stop playing
+          ref.read(webReaderProvider.notifier).setPlaying(false);
+        }
+      }
+    }
+  }
+
+  Future<void> _speakCurrentContent() async {
+    final state = ref.read(webReaderProvider);
+    if (state.content?.content.isNotEmpty ?? false) {
+      await _tts.speak(content: state.content!.content);
     }
   }
 
   void _nextChapter() {
     ref.read(webReaderProvider.notifier).loadNextChapter();
+    if (ref.read(webReaderProvider).isPlaying) {
+      Future.delayed(const Duration(milliseconds: 500), _speakCurrentContent);
+    }
+  }
+
+  void _prevChapter() {
+    ref.read(webReaderProvider.notifier).loadPrevChapter();
+    if (ref.read(webReaderProvider).isPlaying) {
+      Future.delayed(const Duration(milliseconds: 500), _speakCurrentContent);
+    }
+  }
+
+  void _showChapterList() {
+    ref.read(webReaderProvider.notifier).toggleChapterList();
   }
 
   @override
@@ -72,6 +126,14 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
       appBar: AppBar(
         title: const Text('Nghe truyện từ Web'),
         centerTitle: true,
+        actions: [
+          if (state.content != null && state.content!.chapters.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.list_alt),
+              onPressed: _showChapterList,
+              tooltip: 'Danh sách chương (${state.content!.chapters.length})',
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -148,17 +210,32 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
             Expanded(
               child: Column(
                 children: [
-                  // Content Title
+                  // Content Title + Chapter Info
                   Container(
                     padding: const EdgeInsets.all(16),
                     color: Colors.grey.shade100,
-                    child: Text(
-                      state.content!.title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
+                    child: Column(
+                      children: [
+                        Text(
+                          state.content!.title,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (state.chapterInfo.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Chương ${state.chapterInfo}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   // Content Text
@@ -190,31 +267,45 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
               ),
               child: Column(
                 children: [
-                  // Playback Controls
+                  // Chapter Navigation
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       IconButton.filled(
-                        onPressed: state.isLoading ? null : _togglePlayPause,
-                        icon: Icon(
-                          state.isPlaying ? Icons.pause : Icons.play_arrow,
-                        ),
-                        tooltip: state.isPlaying ? 'Tạm dừng' : 'Phát',
+                        onPressed: (state.content?.hasPrevChapter ?? false) &&
+                                !state.isLoading
+                            ? _prevChapter
+                            : null,
+                        icon: const Icon(Icons.skip_previous),
+                        tooltip: 'Chương trước',
                       ),
-                      const SizedBox(width: 16),
-                      if (state.content!.nextChapterUrl != null)
-                        IconButton.filled(
-                          onPressed: state.isLoading ? null : _nextChapter,
-                          icon: const Icon(Icons.skip_next),
-                          tooltip: 'Chương tiếp theo',
-                        ),
+                      // Playback Controls
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton.filled(
+                            onPressed: state.isLoading ? null : _togglePlayPause,
+                            icon: Icon(
+                              state.isPlaying ? Icons.pause : Icons.play_arrow,
+                            ),
+                            tooltip: state.isPlaying ? 'Tạm dừng' : 'Phát',
+                          ),
+                          const SizedBox(width: 16),
+                          if (state.content?.hasNextChapter ?? false)
+                            IconButton.filled(
+                              onPressed: state.isLoading ? null : _nextChapter,
+                              icon: const Icon(Icons.skip_next),
+                              tooltip: 'Chương tiếp theo',
+                            ),
+                        ],
+                      ),
+                      const SizedBox(width: 48), // Balance
                     ],
                   ),
                   const SizedBox(height: 12),
                   // TTS Settings Button
                   ElevatedButton.icon(
                     onPressed: () {
-                      // Navigate to TTS settings
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('TTS Settings - Coming soon'),
@@ -227,6 +318,121 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
                 ],
               ),
             ),
+        ],
+      ),
+      // Chapter List Bottom Sheet
+      bottomSheet: state.showChapterList && state.content != null
+          ? _buildChapterList(context, state)
+          : null,
+    );
+  }
+
+  Widget _buildChapterList(BuildContext context, WebReaderState state) {
+    final chapters = state.content!.chapters;
+    final currentIndex = state.content!.currentChapterIndex;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.6,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Handle
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade400,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Title
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Danh sách chương (${chapters.length})',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  onPressed: () =>
+                      ref.read(webReaderProvider.notifier).toggleChapterList(),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Chapter List
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: chapters.length,
+              itemBuilder: (context, index) {
+                final chapter = chapters[index];
+                final isCurrent = index == currentIndex;
+
+                return ListTile(
+                  leading: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: isCurrent
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.transparent,
+                    child: Text(
+                      '${index + 1}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isCurrent
+                            ? Theme.of(context).colorScheme.onPrimary
+                            : Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  title: Text(
+                    chapter.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                      color: isCurrent
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
+                  ),
+                  trailing: isCurrent
+                      ? Icon(
+                          Icons.play_circle_filled,
+                          color: Theme.of(context).colorScheme.primary,
+                        )
+                      : null,
+                  onTap: () {
+                    ref.read(webReaderProvider.notifier).loadChapter(index);
+                    if (state.isPlaying) {
+                      Future.delayed(const Duration(milliseconds: 300), _speakCurrentContent);
+                    }
+                  },
+                  tileColor: isCurrent
+                      ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+                      : null,
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
