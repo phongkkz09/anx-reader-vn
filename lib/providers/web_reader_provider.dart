@@ -57,7 +57,7 @@ class WebReaderNotifier extends StateNotifier<WebReaderState> {
 
   /// Restore last reading position
   void _restoreProgress() {
-    final savedUrl = Prefs().get('web_reader_last_url') ?? '';
+    final savedUrl = Prefs().prefs.getString('web_reader_last_url') ?? '';
     if (savedUrl.isNotEmpty) {
       loadContent(savedUrl, saveProgress: false);
     }
@@ -65,7 +65,7 @@ class WebReaderNotifier extends StateNotifier<WebReaderState> {
 
   /// Save current reading position
   void _saveProgress(String url) {
-    Prefs().set('web_reader_last_url', url);
+    Prefs().prefs.setString('web_reader_last_url', url);
   }
 
   /// Fetch and extract content from URL
