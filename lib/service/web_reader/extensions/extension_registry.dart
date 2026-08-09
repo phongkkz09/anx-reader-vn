@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'source_extension.dart';
+import 'package:anx_reader/service/web_reader/extensions/source_extension.dart';
 
 /// Extension Registry — manages all source extensions
 /// Loads built-in + custom extensions, provides URL matching
