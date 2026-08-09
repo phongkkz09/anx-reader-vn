@@ -17,6 +17,8 @@ import 'package:anx_reader/widgets/web_reader/download_manager_sheet.dart';
 import 'package:anx_reader/widgets/web_reader/provider_config_dialog.dart';
 import 'package:anx_reader/widgets/web_reader/update_dialog.dart';
 import 'package:anx_reader/widgets/web_reader/export_dialog.dart';
+import 'package:anx_reader/widgets/web_reader/reading_appearance_sheet.dart';
+import 'package:anx_reader/service/web_reader/reading_settings.dart';
 
 class WebReaderPage extends ConsumerStatefulWidget {
   const WebReaderPage({Key? key}) : super(key: key);
@@ -202,6 +204,13 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
             tooltip: 'Nguồn truyện',
           ),
           IconButton(
+            icon: const Icon(Icons.format_paint),
+            onPressed: () {
+              ReadingAppearanceSheet.show(context);
+            },
+            tooltip: 'Giao diện đọc',
+          ),
+          IconButton(
             icon: const Icon(Icons.system_update),
             onPressed: () {
               AboutAppDialog.show(context);
@@ -327,13 +336,13 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
                   ),
                   // Content Text
                   Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        state.content!.content,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          height: 1.6,
+                    child: Container(
+                      color: ReadingSettings().backgroundColor,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          state.content!.content,
+                          style: ReadingSettings().readingStyle(),
                         ),
                       ),
                     ),
