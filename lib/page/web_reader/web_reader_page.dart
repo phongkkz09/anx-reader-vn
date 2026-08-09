@@ -8,6 +8,8 @@ import 'package:anx_reader/service/web_reader/web_reader_settings.dart';
 import 'package:anx_reader/service/web_reader/web_source.dart';
 import 'package:anx_reader/service/web_reader/web_reader_handler.dart';
 import 'package:anx_reader/service/web_reader/download_manager.dart';
+import 'package:anx_reader/service/web_reader/web_novel_library.dart';
+import 'package:anx_reader/page/web_reader/web_novel_library_page.dart';
 import 'package:anx_reader/widgets/web_reader/web_reader_settings_sheet.dart';
 import 'package:anx_reader/widgets/web_reader/source_manager_dialog.dart';
 import 'package:anx_reader/widgets/web_reader/download_manager_sheet.dart';
@@ -358,6 +360,14 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
                   // TTS Settings Button
                   ElevatedButton.icon(
                     onPressed: () {
+                      _addToLibrary(state.content!.title);
+                    },
+                    icon: const Icon(Icons.library_add),
+                    label: const Text('Thêm vào thư viện'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () {
                       WebReaderSettingsSheet.show(
                         context,
                         settings: _settings,
@@ -490,5 +500,51 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
         ],
       ),
     );
+  }
+
+  void _addToLibrary(String novelTitle) {
+    final library = WebNovelLibrary();
+    library.load();
+    
+    final url = _urlController.text.trim();
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng dán link truyện')),
+      );
+      return;
+    }
+    
+    if (library.isTracked(url)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Truyện đã có trong thư viện')),
+      );
+      return;
+    }
+    
+    final item = WebNovelItem(
+      id: '${DateTime.now().millisecondsSinceEpoch}',
+      title: novelTitle,
+      url: url,
+      sourceName: _sourceService.detectSource(url)?.name ?? 'Custom',
+    );
+    
+    library.addNovel(item).then((_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã thêm "$novelTitle" vào thư viện'),
+          action: SnackBarAction(
+            label: 'Xem',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const WebNovelLibraryPage(),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    });
   }
 }
