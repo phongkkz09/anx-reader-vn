@@ -258,7 +258,7 @@ class WebNovelLibrary {
   
   /// Sort novels
   List<WebNovelItem> sort(SortOption option, {bool ascending = true}) {
-    final sorted = List<WebNovelItem>.from(_items);
+    var sorted = List<WebNovelItem>.from(_items);
     
     switch (option) {
       case SortOption.title:
