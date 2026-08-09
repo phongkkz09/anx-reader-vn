@@ -14,6 +14,7 @@ import 'package:anx_reader/widgets/web_reader/web_reader_settings_sheet.dart';
 import 'package:anx_reader/widgets/web_reader/extension_manager_dialog.dart';
 import 'package:anx_reader/widgets/web_reader/download_manager_sheet.dart';
 import 'package:anx_reader/widgets/web_reader/provider_config_dialog.dart';
+import 'package:anx_reader/widgets/web_reader/update_dialog.dart';
 
 class WebReaderPage extends ConsumerStatefulWidget {
   const WebReaderPage({Key? key}) : super(key: key);
@@ -182,6 +183,13 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
               ExtensionManagerDialog.show(context);
             },
             tooltip: 'Nguồn truyện',
+          ),
+          IconButton(
+            icon: const Icon(Icons.system_update),
+            onPressed: () {
+              AboutAppDialog.show(context);
+            },
+            tooltip: 'Về ứng dụng',
           ),
           if (state.content != null && state.content!.chapters.isNotEmpty)
             IconButton(
