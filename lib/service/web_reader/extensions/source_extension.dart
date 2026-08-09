@@ -77,7 +77,7 @@ class SourceExtension {
         .replaceAll('.', '\\.')
         .replaceAll('*', '.*')
         .replaceAll('/', '\\/');
-    final regex = RegExp('^$regexPattern$');
+    final regex = RegExp('^' + regexPattern + '\$');
     return regex.hasMatch(url);
   }
   
