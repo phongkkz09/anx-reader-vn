@@ -5,13 +5,13 @@ import 'package:anx_reader/service/tts/tts_factory.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/web_reader/web_reader_settings.dart';
-import 'package:anx_reader/service/web_reader/web_source.dart';
+import 'package:anx_reader/service/web_reader/extensions/extension_registry.dart';
 import 'package:anx_reader/service/web_reader/web_reader_handler.dart';
 import 'package:anx_reader/service/web_reader/download_manager.dart';
 import 'package:anx_reader/service/web_reader/web_novel_library.dart';
 import 'package:anx_reader/page/web_reader/web_novel_library_page.dart';
 import 'package:anx_reader/widgets/web_reader/web_reader_settings_sheet.dart';
-import 'package:anx_reader/widgets/web_reader/source_manager_dialog.dart';
+import 'package:anx_reader/widgets/web_reader/extension_manager_dialog.dart';
 import 'package:anx_reader/widgets/web_reader/download_manager_sheet.dart';
 
 class WebReaderPage extends ConsumerStatefulWidget {
@@ -24,7 +24,7 @@ class WebReaderPage extends ConsumerStatefulWidget {
 class _WebReaderPageState extends ConsumerState<WebReaderPage> {
   final _urlController = TextEditingController();
   final _settings = WebReaderSettings();
-  final _sourceService = WebSourceService();
+  final _extensionRegistry = ExtensionRegistry();
   final _audioHandler = WebReaderHandler();
   final _downloadManager = DownloadManager();
   late BaseTts _tts;
@@ -169,15 +169,9 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
             tooltip: 'Tải xuống',
           ),
           IconButton(
-            icon: const Icon(Icons.language),
+            icon: const Icon(Icons.extension),
             onPressed: () {
-              SourceManagerDialog.show(
-                context,
-                service: _sourceService,
-                onSourceSelected: (source) {
-                  _urlController.text = source.baseUrl;
-                },
-              );
+              ExtensionManagerDialog.show(context);
             },
             tooltip: 'Nguồn truyện',
           ),
@@ -525,7 +519,7 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
       id: '${DateTime.now().millisecondsSinceEpoch}',
       title: novelTitle,
       url: url,
-      sourceName: _sourceService.detectSource(url)?.name ?? 'Custom',
+      sourceName: _extensionRegistry.detectSource(url)?.name ?? 'Custom',
     );
     
     library.addNovel(item).then((_) {
