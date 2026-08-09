@@ -32,6 +32,9 @@ class WebReaderHandler extends BaseAudioHandler with SeekHandler {
   // Current content metadata
   String _currentTitle = 'Web Reader';
   String _currentUrl = '';
+  
+  // Pronunciation settings reference
+  final WebReaderSettings _settings = WebReaderSettings();
 
   /// Initialize the handler with callbacks
   Future<void> init({
@@ -136,7 +139,7 @@ class WebReaderHandler extends BaseAudioHandler with SeekHandler {
       await tts.resume();
     } else {
       tts.updateTtsState(TtsStateEnum.playing);
-      await tts.speak();
+      await _speakWithPronunciation();
     }
   }
 
@@ -205,6 +208,23 @@ class WebReaderHandler extends BaseAudioHandler with SeekHandler {
   /// Set rate (speed)
   set rate(double rate) => tts.rate = rate;
   double get rate => tts.rate;
+
+  /// Speak text with pronunciation applied
+  /// This ensures pronunciation dictionary is respected regardless of
+  /// whether TTS is triggered from UI, notification, or background playback
+  Future<void> _speakWithPronunciation() async {
+    // Get current text from callback
+    if (_getCurrentText == null) return;
+    
+    final text = await _getCurrentText!() as String;
+    if (text.isEmpty) return;
+    
+    // Apply pronunciation dictionary
+    final processedText = _settings.applyPronunciations(text);
+    
+    // Speak the processed text
+    await tts.speak(content: processedText);
+  }
 
   /// Dispose resources
   Future<void> dispose() async {
