@@ -1,6 +1,10 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart' as html_dom;
+
+/// Byte order for UTF-16 decoding
+enum _Endianness { little, big }
 
 /// Model for a single chapter
 class WebChapter {
@@ -75,8 +79,18 @@ class WebContentExtractor {
   /// Extract content from a web URL
   Future<WebContent> extractContent(String url) async {
     try {
-      final response = await _dio.get(url);
-      final document = html_parser.parse(response.data);
+      final response = await _dio.get<List<int>>(
+        url,
+        options: Options(responseType: ResponseType.bytes),
+      );
+
+      // Detect encoding from headers + meta tags, then decode properly
+      final htmlText = _decodeHtml(
+        response.data ?? <int>[],
+        response.headers.value('content-type'),
+      );
+
+      final document = html_parser.parse(htmlText);
 
       // Extract title
       final title = _extractTitle(document);
@@ -104,6 +118,170 @@ class WebContentExtractor {
     } catch (e) {
       throw Exception('Failed to extract content from $url: $e');
     }
+  }
+
+  /// Decode raw HTML bytes using detected charset.
+  ///
+  /// Priority:
+  /// 1. HTTP Content-Type header charset
+  /// 2. `<meta charset>` / `<meta http-equiv="content-type">` in first 4KB
+  /// 3. BOM detection (UTF-8 / UTF-16LE / UTF-16BE)
+  /// 4. Fallback UTF-8
+  ///
+  /// Keeps UTF-8 untouched (fast path). Converts only when needed.
+  String _decodeHtml(List<int> bytes, String? contentType) {
+    if (bytes.isEmpty) return '';
+
+    // 1. BOM detection (most reliable)
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) {
+      return utf8.decode(bytes.sublist(3), allowMalformed: true);
+    }
+    if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
+      return _decodeUtf16(bytes.sublist(2), _Endianness.little);
+    }
+    if (bytes.length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
+      return _decodeUtf16(bytes.sublist(2), _Endianness.big);
+    }
+
+    // 2. Charset from Content-Type header, e.g. "text/html; charset=windows-1258"
+    final headerCharset = _extractCharset(contentType);
+    if (headerCharset != null) {
+      final decoded = _decodeWithCharset(bytes, headerCharset);
+      if (decoded != null) return decoded;
+    }
+
+    // 3. Charset from <meta> tags (scan first 4KB as latin1 to find meta)
+    final headSnippet = latin1.decode(
+      bytes.length > 4096 ? bytes.sublist(0, 4096) : bytes,
+      allowMalformed: true,
+    );
+    final metaCharset = _extractMetaCharset(headSnippet);
+    if (metaCharset != null) {
+      final decoded = _decodeWithCharset(bytes, metaCharset);
+      if (decoded != null) return decoded;
+    }
+
+    // 4. Fallback: try UTF-8, then latin1 (never throws)
+    try {
+      return utf8.decode(bytes, allowMalformed: true);
+    } catch (_) {
+      return latin1.decode(bytes, allowMalformed: true);
+    }
+  }
+
+  /// Extract charset=... from Content-Type header value.
+  String? _extractCharset(String? contentType) {
+    if (contentType == null) return null;
+    final match = RegExp(r'charset\s*=\s*["\']?([\w-]+)', caseSensitive: false)
+        .firstMatch(contentType);
+    return match?.group(1)?.toLowerCase();
+  }
+
+  /// Extract charset from <meta> tags in head snippet.
+  String? _extractMetaCharset(String headSnippet) {
+    final metaCharset = RegExp(
+      r'<meta[^>]+charset\s*=\s*["\']?([\w-]+)',
+      caseSensitive: false,
+    ).firstMatch(headSnippet);
+    if (metaCharset != null) return metaCharset.group(1)!.toLowerCase();
+
+    final httpEquiv = RegExp(
+      r'<meta[^>]+http-equiv\s*=\s*["\']?content-type["\']?[^>]*content\s*=\s*["\'][^"\']*charset\s*=\s*([\w-]+)',
+      caseSensitive: false,
+    ).firstMatch(headSnippet);
+    return httpEquiv?.group(1)?.toLowerCase();
+  }
+
+  /// Decode bytes using a charset name. Returns null for unsupported charsets.
+  String? _decodeWithCharset(List<int> bytes, String charset) {
+    switch (charset) {
+      case 'utf-8':
+      case 'utf8':
+        return utf8.decode(bytes, allowMalformed: true);
+      case 'utf-16':
+      case 'utf-16le':
+        return _decodeUtf16(bytes, _Endianness.little);
+      case 'utf-16be':
+        return _decodeUtf16(bytes, _Endianness.big);
+      case 'latin1':
+      case 'iso-8859-1':
+      case 'iso-8859-2':
+        return latin1.decode(bytes, allowMalformed: true);
+      case 'windows-1258':
+        // Vietnamese single-byte codepage (mostly ASCII-compatible + VN accents)
+        return _decodeWindows1258(bytes);
+      case 'windows-1252':
+        return _decodeWindows1252(bytes);
+      default:
+        // Unknown charset (TCVN-12980, VISCII, etc.) — try UTF-8, keep original
+        return null;
+    }
+  }
+
+  /// Decode UTF-16 with explicit endianness.
+  String _decodeUtf16(List<int> bytes, _Endianness endianness) {
+    final units = <int>[];
+    for (int i = 0; i + 1 < bytes.length; i += 2) {
+      units.add(endianness == _Endianness.little
+          ? bytes[i] | (bytes[i + 1] << 8)
+          : (bytes[i] << 8) | bytes[i + 1]);
+    }
+    return String.fromCharCodes(units);
+  }
+
+  /// Decode Windows-1258 (Vietnamese, based on Windows-1252 with VN overrides).
+  String _decodeWindows1258(List<int> bytes) {
+    // Windows-1258 maps most bytes same as Windows-1252; Vietnamese
+    // diacritics occupy 0x80-0x9F range. Use cp1252 table then override
+    // the Vietnamese positions.
+    const cp1252 = [
+      0x20AC, 0xFFFD, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+      0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0xFFFD, 0x017D, 0xFFFD,
+      0xFFFD, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+      0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0xFFFD, 0x017E, 0x0178,
+    ];
+    // Windows-1258 Vietnamese-specific replacements for 0x80-0x9F:
+    // 0x80 À, 0x81 Á, 0x82 Â, 0x83 Ã, 0x84 È, 0x85 É, 0x86 Ê, 0x87 Ì,
+    // 0x88 Í, 0x89 Ò, 0x8A Ó, 0x8B Ô, 0x8C Õ, 0x8D Ù, 0x8E Ú, 0x8F Ý,
+    // 0x90 à, 0x91 á, 0x92 â, 0x93 ã, 0x94 è, 0x95 é, 0x96 ê, 0x97 ì,
+    // 0x98 í, 0x99 ò, 0x9A ó, 0x9B ô, 0x9C õ, 0x9D ù, 0x9E ú, 0x9F ý
+    const vnOverrides = [
+      0x00C0, 0x00C1, 0x00C2, 0x00C3, 0x00C8, 0x00C9, 0x00CA, 0x00CC,
+      0x00CD, 0x00D2, 0x00D3, 0x00D4, 0x00D5, 0x00D9, 0x00DA, 0x00DD,
+      0x00E0, 0x00E1, 0x00E2, 0x00E3, 0x00E8, 0x00E9, 0x00EA, 0x00EC,
+      0x00ED, 0x00F2, 0x00F3, 0x00F4, 0x00F5, 0x00F9, 0x00FA, 0x00FD,
+    ];
+    final sb = StringBuffer();
+    for (final b in bytes) {
+      if (b >= 0x80 && b <= 0x9F) {
+        sb.writeCharCode(vnOverrides[b - 0x80]);
+      } else if (b >= 0xA0) {
+        sb.writeCharCode(cp1252[b - 0x80]);
+      } else {
+        sb.writeCharCode(b);
+      }
+    }
+    return sb.toString();
+  }
+
+  /// Decode Windows-1252 (fallback for Western European sites).
+  String _decodeWindows1252(List<int> bytes) {
+    const cp1252 = [
+      0x20AC, 0xFFFD, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+      0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0xFFFD, 0x017D, 0xFFFD,
+      0xFFFD, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+      0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0xFFFD, 0x017E, 0x0178,
+    ];
+    final sb = StringBuffer();
+    for (final b in bytes) {
+      if (b >= 0x80) {
+        sb.writeCharCode(cp1252[b - 0x80]);
+      } else {
+        sb.writeCharCode(b);
+      }
+    }
+    return sb.toString();
   }
 
   /// Extract page title
