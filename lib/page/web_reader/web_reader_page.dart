@@ -19,6 +19,8 @@ import 'package:anx_reader/widgets/web_reader/update_dialog.dart';
 import 'package:anx_reader/widgets/web_reader/export_dialog.dart';
 import 'package:anx_reader/widgets/web_reader/reading_appearance_sheet.dart';
 import 'package:anx_reader/widgets/web_reader/cache_manager_sheet.dart';
+import 'package:anx_reader/widgets/web_reader/bookmark_history_sheet.dart';
+import 'package:anx_reader/service/web_reader/bookmark_service.dart';
 import 'package:anx_reader/service/web_reader/reading_settings.dart';
 
 class WebReaderPage extends ConsumerStatefulWidget {
@@ -210,6 +212,23 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
               CacheManagerSheet.show(context);
             },
             tooltip: 'Bộ nhớ đệm',
+          ),
+          IconButton(
+            icon: const Icon(Icons.bookmark_border),
+            onPressed: () {
+              final state = ref.read(webReaderProvider);
+              BookmarkHistorySheet.show(
+                context,
+                currentUrl: state.url,
+                currentTitle: state.content?.title,
+                currentChapterTitle: state.chapterInfo,
+                currentChapterIndex: state.content?.currentChapterIndex ?? 0,
+                onNavigate: (url) {
+                  ref.read(webReaderProvider.notifier).loadContent(url);
+                },
+              );
+            },
+            tooltip: 'Đánh dấu & Lịch sử',
           ),
           IconButton(
             icon: const Icon(Icons.format_paint),

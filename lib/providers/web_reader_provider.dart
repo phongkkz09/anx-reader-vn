@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:anx_reader/service/web_reader/web_content_extractor.dart';
+import 'package:anx_reader/service/web_reader/bookmark_service.dart';
 import 'package:anx_reader/service/web_reader/web_reader_settings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 
@@ -88,6 +89,15 @@ class WebReaderNotifier extends StateNotifier<WebReaderState> {
       if (saveProgress) {
         _saveProgress(url);
       }
+
+      // Add to reading history
+      final bookmarkService = BookmarkService();
+      await bookmarkService.init();
+      await bookmarkService.addHistory(
+        url: url,
+        title: content.title,
+        chapterTitle: 'Chương ${content.currentChapterIndex + 1}',
+      );
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
