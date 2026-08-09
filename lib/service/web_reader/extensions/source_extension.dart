@@ -77,7 +77,8 @@ class SourceExtension {
         .replaceAll('.', '\\.')
         .replaceAll('*', '.*')
         .replaceAll('/', '\\/');
-    return RegExp('^$regexPattern$').hasMatch(url);
+    final regex = RegExp('^$regexPattern$');
+    return regex.hasMatch(url);
   }
   
   Map<String, dynamic> toJson() => {
