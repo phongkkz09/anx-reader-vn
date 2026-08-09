@@ -23,7 +23,7 @@ class ExtensionRegistry {
 
   /// Built-in extensions (Vietnamese + international sources)
   final List<SourceExtension> builtIn = [
-    const SourceExtension(
+    SourceExtension(
       id: 'truyenfull',
       name: 'TruyenFull',
       baseUrl: 'https://truyenfull.vn',
@@ -38,7 +38,7 @@ class ExtensionRegistry {
       description: 'Truyện Full — kho tàng truyện online lớn nhất Việt Nam',
       version: '1.2.0',
     ),
-    const SourceExtension(
+    SourceExtension(
       id: 'truyenqq',
       name: 'TruyenQQ',
       baseUrl: 'https://truyenqqvn.com',
@@ -51,7 +51,7 @@ class ExtensionRegistry {
       description: 'TruyenQQ — đọc truyện tranh online',
       version: '1.1.0',
     ),
-    const SourceExtension(
+    SourceExtension(
       id: 'nettruyen',
       name: 'NetTruyen',
       baseUrl: 'https://www.nettruyen.com',
@@ -64,7 +64,7 @@ class ExtensionRegistry {
       description: 'NetTruyen — truyện tranh online',
       version: '1.1.0',
     ),
-    const SourceExtension(
+    SourceExtension(
       id: 'blogtruyen',
       name: 'BlogTruyen',
       baseUrl: 'https://blogtruyen.vn',
@@ -77,7 +77,7 @@ class ExtensionRegistry {
       description: 'BlogTruyen — đọc truyện online',
       version: '1.0.0',
     ),
-    const SourceExtension(
+    SourceExtension(
       id: 'doctruyen3q',
       name: 'DocTruyen3Q',
       baseUrl: 'https://doctruyen3q.com',
@@ -90,7 +90,7 @@ class ExtensionRegistry {
       description: 'DocTruyen3Q — đọc truyện tranh online',
       version: '1.0.0',
     ),
-    const SourceExtension(
+    SourceExtension(
       id: 'truyencv',
       name: 'TruyenCV',
       baseUrl: 'https://truyencv.com',
@@ -105,7 +105,7 @@ class ExtensionRegistry {
       description: 'TruyenCV — đọc truyện online',
       version: '1.0.0',
     ),
-    const SourceExtension(
+    SourceExtension(
       id: 'wikipedia',
       name: 'Wikipedia',
       baseUrl: 'https://vi.wikipedia.org',
@@ -117,7 +117,7 @@ class ExtensionRegistry {
       description: 'Wikipedia — bách khoa toàn thư',
       version: '1.0.0',
     ),
-    const SourceExtension(
+    SourceExtension(
       id: 'generic',
       name: 'Generic (any URL)',
       baseUrl: '',
