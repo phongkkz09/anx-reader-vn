@@ -275,7 +275,7 @@ class WebNovelLibrary {
         break;
     }
     
-    if (!ascending) sorted.reverse;
+    if (!ascending) sorted = sorted.reversed.toList();
     return sorted;
   }
   
