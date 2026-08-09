@@ -135,16 +135,21 @@ class ExportService {
     );
   }
 
-  /// Build a WebNovelItem's chapters from library
+  /// Build chapter list from WebNovelItem
   /// Returns list of {title, url, content} — content must be filled by caller
-  List<Map<String, String>> buildChaptersFromItem(WebNovelItem item) {
-    return item.chapters
-        .map((c) => {
-              'title': c.title,
-              'url': c.url,
-              'content': '',
-            })
-        .toList();
+  List<Map<String, String>> buildChaptersFromItem(
+    String title,
+    String url,
+    int totalChapters,
+  ) {
+    return List.generate(
+      totalChapters,
+      (i) => {
+        'title': title,
+        'url': url,
+        'content': '',
+      },
+    );
   }
 
   // ============ EPUB helpers ============

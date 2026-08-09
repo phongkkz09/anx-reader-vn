@@ -7,6 +7,7 @@ import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/web_reader/web_reader_settings.dart';
 import 'package:anx_reader/service/web_reader/extensions/extension_registry.dart';
 import 'package:anx_reader/service/web_reader/web_reader_handler.dart';
+import 'package:anx_reader/service/web_reader/web_content_extractor.dart';
 import 'package:anx_reader/service/web_reader/download_manager.dart';
 import 'package:anx_reader/service/web_reader/web_novel_library.dart';
 import 'package:anx_reader/page/web_reader/web_novel_library_page.dart';
@@ -164,7 +165,7 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
       fetchChapterContent: (url) async {
         // Fetch chapter content using WebContentExtractor
         final extractor = WebContentExtractor();
-        final chapterContent = await extractor.fetchAndExtract(url);
+        final chapterContent = await extractor.extractContent(url);
         return chapterContent.content;
       },
     );
