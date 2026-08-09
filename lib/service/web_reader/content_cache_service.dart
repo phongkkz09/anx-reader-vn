@@ -53,8 +53,8 @@ class CacheItem {
 class CacheStats {
   final int itemCount;
   final int totalSizeKB;
-  final DateTime oldestItem;
-  final DateTime newestItem;
+  final DateTime? oldestItem;
+  final DateTime? newestItem;
 
   const CacheStats({
     required this.itemCount,
