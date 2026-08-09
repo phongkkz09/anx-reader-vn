@@ -242,27 +242,28 @@ class WebContentExtractor {
   }
 
   /// Extract charset=... from Content-Type header value.
-  String? _extractCharset(String? contentType) {
-    if (contentType == null) return null;
-    final match = RegExp(r'charset\s*=\s*["\']?([\w-]+)', caseSensitive: false)
-        .firstMatch(contentType);
-    return match?.group(1)?.toLowerCase();
-  }
+    String? _extractCharset(String? contentType) {
+      if (contentType == null) return null;
+      // Use normal string (not raw) to properly escape quotes in character class
+      final match = RegExp('charset\\s*=\\s*["\']?([\\w-]+)', caseSensitive: false)
+          .firstMatch(contentType);
+      return match?.group(1)?.toLowerCase();
+    }
 
   /// Extract charset from <meta> tags in head snippet.
-  String? _extractMetaCharset(String headSnippet) {
-    final metaCharset = RegExp(
-      r'<meta[^>]+charset\s*=\s*["\']?([\w-]+)',
-      caseSensitive: false,
-    ).firstMatch(headSnippet);
-    if (metaCharset != null) return metaCharset.group(1)!.toLowerCase();
+    String? _extractMetaCharset(String headSnippet) {
+      final metaCharset = RegExp(
+        '<meta[^>]+charset\\s*=\\s*["\']?([\\w-]+)',
+        caseSensitive: false,
+      ).firstMatch(headSnippet);
+      if (metaCharset != null) return metaCharset.group(1)!.toLowerCase();
 
-    final httpEquiv = RegExp(
-      r'<meta[^>]+http-equiv\s*=\s*["\']?content-type["\']?[^>]*content\s*=\s*["\'][^"\']*charset\s*=\s*([\w-]+)',
-      caseSensitive: false,
-    ).firstMatch(headSnippet);
-    return httpEquiv?.group(1)?.toLowerCase();
-  }
+      final httpEquiv = RegExp(
+        '<meta[^>]+http-equiv\\s*=\\s*["\']?content-type["\']?[^>]*content\\s*=\\s*["\'][^"\']*charset\\s*=\\s*([\\w-]+)',
+        caseSensitive: false,
+      ).firstMatch(headSnippet);
+      return httpEquiv?.group(1)?.toLowerCase();
+    }
 
   /// Decode bytes using a charset name. Returns null for unsupported charsets.
   String? _decodeWithCharset(List<int> bytes, String charset) {
