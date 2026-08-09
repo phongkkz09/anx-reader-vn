@@ -7,8 +7,10 @@ import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/web_reader/web_reader_settings.dart';
 import 'package:anx_reader/service/web_reader/web_source.dart';
 import 'package:anx_reader/service/web_reader/web_reader_handler.dart';
+import 'package:anx_reader/service/web_reader/download_manager.dart';
 import 'package:anx_reader/widgets/web_reader/web_reader_settings_sheet.dart';
 import 'package:anx_reader/widgets/web_reader/source_manager_dialog.dart';
+import 'package:anx_reader/widgets/web_reader/download_manager_sheet.dart';
 
 class WebReaderPage extends ConsumerStatefulWidget {
   const WebReaderPage({Key? key}) : super(key: key);
@@ -22,6 +24,7 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
   final _settings = WebReaderSettings();
   final _sourceService = WebSourceService();
   final _audioHandler = WebReaderHandler();
+  final _downloadManager = DownloadManager();
   late BaseTts _tts;
   bool _ttsInitialized = false;
   String? _sleepTimerDisplay;
@@ -156,6 +159,13 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
         title: const Text('Nghe truyện từ Web'),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.download),
+            onPressed: () {
+              DownloadManagerSheet.show(context);
+            },
+            tooltip: 'Tải xuống',
+          ),
           IconButton(
             icon: const Icon(Icons.language),
             onPressed: () {
