@@ -131,24 +131,46 @@ class WebContentExtractor {
 
   /// Extract main content and clean ads/clutter
   String _extractMainContent(html_dom.Document document) {
-    // Try common content containers
+    // Site-specific selectors first (priority order)
+    final siteSpecificSelectors = [
+      '#chapter-content', // TruyenFull, WebTruyen
+      '.chapter-content', // Most VN novel sites
+      '.content-chapter', // MeTruyenChu
+      '.reading-detail', // Some sites
+      'div.txt', // TruyenFull variant
+    ];
+    
+    // Generic content containers (fallback)
     final contentSelectors = [
       'article',
       '.article-content',
       '.post-content',
-      '.chapter-content',
+      'main',
+      '[role="main"]',
       '.content',
       '#content',
-      'main',
+      '.entry-content',
+      '.text-content',
     ];
 
+    // Try site-specific first
     html_dom.Element? contentElement;
-    for (final selector in contentSelectors) {
+    for (final selector in siteSpecificSelectors) {
       contentElement = document.querySelector(selector);
-      if (contentElement != null) break;
+      if (contentElement != null && contentElement.text.trim().length > 50) break;
+      contentElement = null;
     }
+    
+    // Fallback to generic selectors
+    contentElement ??= (() {
+      for (final selector in contentSelectors) {
+        final el = document.querySelector(selector);
+        if (el != null && el.text.trim().length > 50) return el;
+      }
+      return null;
+    })();
 
-    // Fallback to body if no container found
+    // Last resort: body
     contentElement ??= document.body;
 
     if (contentElement == null) return '';
@@ -166,23 +188,66 @@ class WebContentExtractor {
   /// Remove ads, scripts, styles, navigation, etc.
   void _removeUnwantedElements(html_dom.Element element) {
     final selectorsToRemove = [
+      // Scripts & styles
       'script',
       'style',
+      'noscript',
+      // Navigation & layout
       'nav',
+      'header',
       'footer',
+      '.header',
+      '.footer',
+      '.navbar',
+      '.navigation',
+      '.breadcrumb',
+      // Ads
       '.advertisement',
       '.ad',
       '.ads',
+      '.ad-container',
+      '.ad-wrapper',
+      '.adbox',
+      '.adsbox',
+      '.adsbygoogle',
+      '[data-ad-client]',
+      '[data-adsbygoogle]',
+      'ins',
+      // Sidebar & widgets
       '.sidebar',
+      '.widget',
+      '.widget-area',
+      '.side-bar',
+      // Comments
       '.comments',
       '.comment-form',
       '#comments',
+      '#comment',
+      '.comment-area',
+      // Social
       '.social-share',
       '.share-buttons',
-      'ins', // Google ads
-      '.adsbox',
-      '[data-ad-client]',
-      '[data-adsbygoogle]',
+      '.share',
+      '.social',
+      // Chapter nav (will be extracted separately)
+      '.chapter-nav',
+      '.chapter-navigation',
+      '.nav-chapter',
+      '.btn-chapter',
+      // Popups & modals
+      '.modal',
+      '.popup',
+      '.overlay',
+      '.lightbox',
+      // Hidden elements
+      '[style*="display: none"]',
+      '[style*="display:none"]',
+      '.hidden',
+      '.d-none',
+      // Specific site ads
+      '.google-auto-placed',
+      '.dfp-tag',
+      '#google_ads_iframe',
     ];
 
     for (final selector in selectorsToRemove) {
@@ -203,9 +268,13 @@ class WebContentExtractor {
   /// Extract next chapter URL
   String? _extractNextChapterUrl(html_dom.Document document, String baseUrl) {
     final nextSelectors = [
+      // Site-specific
+      'a.btn-next', 'a.next-chapter', 'a[title="Next"]', 'a[title="Tiếp theo"]',
+      '.chapter-nav a:last-child', '.nav-chapter a:last-child',
+      // Generic
       'a.next', '.next-chapter', 'a[rel="next"]', '.pagination a.next',
       'a:contains("Next")', 'a:contains("next")', 'a:contains("Tiếp theo")',
-      '.chapter-nav a:last-child', 'a:contains("next chapter")',
+      'a:contains("next chapter")',
     ];
     for (final selector in nextSelectors) {
       final element = document.querySelector(selector);
@@ -222,9 +291,12 @@ class WebContentExtractor {
   /// Extract previous chapter URL
   String? _extractPrevChapterUrl(html_dom.Document document, String baseUrl) {
     final prevSelectors = [
+      // Site-specific
+      'a.btn-prev', 'a.prev-chapter', 'a[title="Prev"]', 'a[title="Trước"]',
+      '.chapter-nav a:first-child', '.nav-chapter a:first-child',
+      // Generic
       'a.prev', '.prev-chapter', 'a[rel="prev"]', '.pagination a.prev',
-      'a:contains("Previous")', 'a:contains("Trước")',
-      '.chapter-nav a:first-child',
+      'a:contains("Previous")', 'a:contains("prev")', 'a:contains("Trước")',
     ];
     for (final selector in prevSelectors) {
       final element = document.querySelector(selector);
@@ -241,8 +313,11 @@ class WebContentExtractor {
   /// Extract chapter list with URLs
   List<WebChapter> _extractChapters(html_dom.Document document, String currentUrl) {
     final chapterSelectors = [
+      // Site-specific
       '.chapter-list li a', '.list-chapter a', '#list-chapter a',
-      '.chapters li a', 'nav.toc a', '.toc a', '.table-of-contents a',
+      '.chapters li a', '.chapter-items a', '.list-chap a',
+      // Generic
+      'nav.toc a', '.toc a', '.table-of-contents a',
       '.chapter-nav a', '[class*="chapter"] a', '[class*="toc"] a',
       'a[href*="chapter"]',
     ];
