@@ -15,6 +15,7 @@ import 'package:anx_reader/widgets/web_reader/extension_manager_dialog.dart';
 import 'package:anx_reader/widgets/web_reader/download_manager_sheet.dart';
 import 'package:anx_reader/widgets/web_reader/provider_config_dialog.dart';
 import 'package:anx_reader/widgets/web_reader/update_dialog.dart';
+import 'package:anx_reader/widgets/web_reader/export_dialog.dart';
 
 class WebReaderPage extends ConsumerStatefulWidget {
   const WebReaderPage({Key? key}) : super(key: key);
@@ -154,6 +155,21 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
     ref.read(webReaderProvider.notifier).toggleChapterList();
   }
 
+  void _showExportDialog(WebContent content) {
+    ExportDialog.show(
+      context: context,
+      novelTitle: content.title,
+      novelAuthor: 'Unknown',
+      chapters: content.chapters,
+      fetchChapterContent: (url) async {
+        // Fetch chapter content using WebContentExtractor
+        final extractor = WebContentExtractor();
+        final chapterContent = await extractor.fetchAndExtract(url);
+        return chapterContent.content;
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(webReaderProvider);
@@ -191,12 +207,18 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
             },
             tooltip: 'Về ứng dụng',
           ),
-          if (state.content != null && state.content!.chapters.isNotEmpty)
+          if (state.content != null && state.content!.chapters.isNotEmpty) ...[
+            IconButton(
+              icon: const Icon(Icons.file_download),
+              onPressed: () => _showExportDialog(state.content!),
+              tooltip: 'Xuất file',
+            ),
             IconButton(
               icon: const Icon(Icons.list_alt),
               onPressed: _showChapterList,
               tooltip: 'Danh sách chương (${state.content!.chapters.length})',
             ),
+          ],
         ],
       ),
       body: Column(
