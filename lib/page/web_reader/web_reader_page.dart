@@ -13,6 +13,7 @@ import 'package:anx_reader/page/web_reader/web_novel_library_page.dart';
 import 'package:anx_reader/widgets/web_reader/web_reader_settings_sheet.dart';
 import 'package:anx_reader/widgets/web_reader/extension_manager_dialog.dart';
 import 'package:anx_reader/widgets/web_reader/download_manager_sheet.dart';
+import 'package:anx_reader/widgets/web_reader/provider_config_dialog.dart';
 
 class WebReaderPage extends ConsumerStatefulWidget {
   const WebReaderPage({Key? key}) : super(key: key);
@@ -161,6 +162,13 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
         title: const Text('Nghe truyện từ Web'),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.psychology),
+            onPressed: () {
+              ProviderConfigDialog.show(context);
+            },
+            tooltip: 'Cấu hình AI/TTS',
+          ),
           IconButton(
             icon: const Icon(Icons.download),
             onPressed: () {
