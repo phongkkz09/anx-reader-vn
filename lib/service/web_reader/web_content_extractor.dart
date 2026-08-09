@@ -206,7 +206,7 @@ class WebContentExtractor {
     // 1. BOM detection (most reliable)
     if (bytes.length >= 3 &&
         bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) {
-      return utf8.decode(bytes.sublist(3), allowInvalid: true);
+      return utf8.decode(bytes.sublist(3));
     }
     if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
       return _decodeUtf16(bytes.sublist(2), _Endianness.little);
@@ -225,7 +225,6 @@ class WebContentExtractor {
     // 3. Charset from <meta> tags (scan first 4KB as latin1 to find meta)
     final headSnippet = latin1.decode(
       bytes.length > 4096 ? bytes.sublist(0, 4096) : bytes,
-      allowInvalid: true,
     );
     final metaCharset = _extractMetaCharset(headSnippet);
     if (metaCharset != null) {
@@ -235,9 +234,9 @@ class WebContentExtractor {
 
     // 4. Fallback: try UTF-8, then latin1 (never throws)
     try {
-      return utf8.decode(bytes, allowInvalid: true);
+      return utf8.decode(bytes);
     } catch (_) {
-      return latin1.decode(bytes, allowInvalid: true);
+      return latin1.decode(bytes);
     }
   }
 
@@ -270,7 +269,7 @@ class WebContentExtractor {
     switch (charset) {
       case 'utf-8':
       case 'utf8':
-        return utf8.decode(bytes, allowInvalid: true);
+        return utf8.decode(bytes);
       case 'utf-16':
       case 'utf-16le':
         return _decodeUtf16(bytes, _Endianness.little);
@@ -279,7 +278,7 @@ class WebContentExtractor {
       case 'latin1':
       case 'iso-8859-1':
       case 'iso-8859-2':
-        return latin1.decode(bytes, allowInvalid: true);
+        return latin1.decode(bytes);
       case 'windows-1258':
         // Vietnamese single-byte codepage (mostly ASCII-compatible + VN accents)
         return _decodeWindows1258(bytes);
