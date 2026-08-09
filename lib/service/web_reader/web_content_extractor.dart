@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart' as html_dom;
+import 'package:anx_reader/service/web_reader/extensions/extension_registry.dart';
+import 'package:anx_reader/service/web_reader/content_cache_service.dart';
+import 'package:flutter/foundation.dart';
 
 /// Byte order for UTF-16 decoding
 enum _Endianness { little, big }
@@ -88,7 +92,23 @@ class WebContentExtractor {
   );
 
   /// Extract content from a web URL
+  /// Checks cache first — returns cached content if available
   Future<WebContent> extractContent(String url) async {
+    // Check cache first
+    final cache = ContentCacheService();
+    await cache.init();
+    final cached = cache.get(url);
+    if (cached != null) {
+      debugPrint('WebContentExtractor: cache hit for $url');
+      return WebContent(
+        title: cached.title,
+        content: cached.content,
+        url: url,
+        chapters: const [],
+        currentChapterIndex: -1,
+      );
+    }
+
     try {
       final response = await _dio.get<List<int>>(
         url,
@@ -108,6 +128,16 @@ class WebContentExtractor {
 
       // Extract main content
       final content = _extractMainContent(document);
+
+      // Cache the result for offline reading
+      if (content.isNotEmpty) {
+        unawaited(cache.put(
+          url: url,
+          title: title,
+          content: content,
+          sourceId: '',
+        ));
+      }
 
       // Extract navigation URLs
       final nextUrl = _extractNextChapterUrl(document, url);

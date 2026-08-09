@@ -18,6 +18,7 @@ import 'package:anx_reader/widgets/web_reader/provider_config_dialog.dart';
 import 'package:anx_reader/widgets/web_reader/update_dialog.dart';
 import 'package:anx_reader/widgets/web_reader/export_dialog.dart';
 import 'package:anx_reader/widgets/web_reader/reading_appearance_sheet.dart';
+import 'package:anx_reader/widgets/web_reader/cache_manager_sheet.dart';
 import 'package:anx_reader/service/web_reader/reading_settings.dart';
 
 class WebReaderPage extends ConsumerStatefulWidget {
@@ -202,6 +203,13 @@ class _WebReaderPageState extends ConsumerState<WebReaderPage> {
               ExtensionManagerDialog.show(context);
             },
             tooltip: 'Nguồn truyện',
+          ),
+          IconButton(
+            icon: const Icon(Icons.storage),
+            onPressed: () {
+              CacheManagerSheet.show(context);
+            },
+            tooltip: 'Bộ nhớ đệm',
           ),
           IconButton(
             icon: const Icon(Icons.format_paint),
