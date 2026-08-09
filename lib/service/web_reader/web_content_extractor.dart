@@ -6,6 +6,17 @@ import 'package:html/dom.dart' as html_dom;
 /// Byte order for UTF-16 decoding
 enum _Endianness { little, big }
 
+/// Custom exception for Web Reader errors
+class WebReaderException implements Exception {
+  final String message;
+  final String? url;
+
+  WebReaderException(this.message, {this.url});
+
+  @override
+  String toString() => message;
+}
+
 /// Model for a single chapter
 class WebChapter {
   final String title;
@@ -115,8 +126,68 @@ class WebContentExtractor {
         chapters: chapters,
         currentChapterIndex: currentIndex,
       );
+    } on DioException catch (e) {
+      // Network/HTTP errors
+      switch (e.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+          throw WebReaderException(
+            'Không thể kết nối đến website (timeout). Vui lòng thử lại sau.',
+            url: url,
+          );
+        case DioExceptionType.connectionError:
+          throw WebReaderException(
+            'Không có kết nối mạng. Vui lòng kiểm tra internet.',
+            url: url,
+          );
+        case DioExceptionType.badResponse:
+          final code = e.response?.statusCode ?? 0;
+          if (code == 404) {
+            throw WebReaderException(
+              'Trang không tồn tại (404). Link có thể đã bị xóa.',
+              url: url,
+            );
+          } else if (code == 403) {
+            throw WebReaderException(
+              'Truy cập bị từ chối (403). Website chặn yêu cầu.',
+              url: url,
+            );
+          } else if (code >= 500) {
+            throw WebReaderException(
+              'Website đang gặp lỗi ($code). Vui lòng thử lại sau.',
+              url: url,
+            );
+          }
+          throw WebReaderException(
+            'Lỗi tải trang ($code). Vui lòng thử lại.',
+            url: url,
+          );
+        case DioExceptionType.cancel:
+          throw WebReaderException('Yêu cầu đã bị hủy.', url: url);
+        case DioExceptionType.badCertificate:
+          throw WebReaderException(
+            'Lỗi chứng chỉ SSL. Không thể kết nối an toàn.',
+            url: url,
+          );
+        default:
+          throw WebReaderException(
+            'Lỗi mạng: ${e.message ?? "Không xác định"}',
+            url: url,
+          );
+      }
+    } on FormatException catch (e) {
+      throw WebReaderException(
+        'Định dạng URL không hợp lệ.',
+        url: url,
+      );
+    } on WebReaderException {
+      rethrow; // Already formatted
     } catch (e) {
-      throw Exception('Failed to extract content from $url: $e');
+      throw WebReaderException(
+        'Lỗi không xác định: ${e.toString()}',
+        url: url,
+      );
     }
   }
 
