@@ -62,6 +62,7 @@ class AiProviderConfig {
     String? model,
     String? type,
     bool? isEnabled,
+    bool? isBuiltIn,
     Map<String, dynamic>? extra,
   }) {
     return AiProviderConfig(
@@ -72,7 +73,7 @@ class AiProviderConfig {
       model: model ?? this.model,
       type: type ?? this.type,
       isEnabled: isEnabled ?? this.isEnabled,
-      isBuiltIn: isBuiltIn,
+      isBuiltIn: isBuiltIn ?? this.isBuiltIn,
       extra: extra ?? this.extra,
     );
   }

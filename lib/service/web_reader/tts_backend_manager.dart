@@ -66,6 +66,7 @@ class TtsBackendConfig {
     String? voice,
     int? sampleRate,
     bool? isEnabled,
+    bool? isBuiltIn,
     Map<String, dynamic>? extra,
   }) {
     return TtsBackendConfig(
@@ -77,7 +78,7 @@ class TtsBackendConfig {
       voice: voice ?? this.voice,
       sampleRate: sampleRate ?? this.sampleRate,
       isEnabled: isEnabled ?? this.isEnabled,
-      isBuiltIn: isBuiltIn,
+      isBuiltIn: isBuiltIn ?? this.isBuiltIn,
       extra: extra ?? this.extra,
     );
   }
