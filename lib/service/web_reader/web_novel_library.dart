@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/web_reader/web_content_extractor.dart';
 import 'package:anx_reader/service/web_reader/download_manager.dart';
+import 'package:anx_reader/utils/iterable_extensions.dart';
 
 /// Model for a web novel item in library
 class WebNovelItem {

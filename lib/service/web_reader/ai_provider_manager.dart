@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/utils/iterable_extensions.dart';
 
 /// AI Provider Configuration
 class AiProviderConfig {
@@ -304,12 +305,4 @@ class AiProviderManager {
 
   /// Get active provider ID
   String? get activeId => _activeId;
-}
-
-/// Extension for firstOrNull on Iterable (Dart < 3.0 compatibility)
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull {
-    final it = iterator;
-    return it.moveNext() ? it.current : null;
-  }
 }
